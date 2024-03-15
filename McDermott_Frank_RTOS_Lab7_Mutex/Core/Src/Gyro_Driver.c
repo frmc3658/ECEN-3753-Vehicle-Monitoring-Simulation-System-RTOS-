@@ -54,7 +54,7 @@ void Gyro_Power_On(){
 	{
 		while(1);
 	}
-	}
+}
 
 
 /**
