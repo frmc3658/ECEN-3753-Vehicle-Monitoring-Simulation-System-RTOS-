@@ -34,7 +34,7 @@
 #define GREEN_LED_PIN						GPIO_PIN_13
 #define GREEN_LED_PORT						GPIOG
 /* Timer Definitions */
-#define HOLD_BTN_TIMER_TICKS_1S				(uint32_t)1000	/* 1 second timer period */
+#define HOLD_BTN_TIMER_TICKS_3S				(uint32_t)3000	/* 1 second timer period */
 #define VEHICLE_DIR_WAKEUP_TIMER_TICKS		(uint32_t)100	/* 100ms timer period */
 #define DIRECTION_ALERT_TIMER_TICKS			(uint32_t)5000	/* 5 second timer period */
 #define LCD_DISPLAY_TIMER_TICKS				(uint32_t)200	/* 100ms timer period */
@@ -70,18 +70,21 @@ typedef enum
 
 typedef enum
 {
+	/* Hold Button Event Flags */
+	buttonPressedEventFlag			= 0x001,	/* Reserved: For ITC options */
+	buttonHeldEventFlag 			= 0x002,	/* Reserved: For ITC options */
+	buttonReleasesEventFlag			= 0x004,	/* Reserved: For ITC options */
+	holdButtonAllEventFlags			= 0x007,	/* Reserved: For ITC options */
 	/* Vehicle Monitor Event Flag Group */
-	speedUpdateEventFlag 			= 0x01,	/* Flag to signal the vehicle speed has been updated */
-	directionUpdateEventFlag		= 0x02, /* Flag to signal the vehicle direction has been updated */
-	speedAndDirectionEventFlags		= 0x03,	/* Both Vehicle Monitor Event Flags */
+	speedUpdateEventFlag 			= 0x008,	/* Flag to signal the vehicle speed has been updated */
+	directionUpdateEventFlag		= 0x010, 	/* Flag to signal the vehicle direction has been updated */
+	vehicleMonitorBothFlags			= 0x018,	/* Both Vehicle Monitor Event Flags */
 	/* LED Output Event Flag Group */
-	activateSpeedAlertEventFlag		= 0x04, /* Flag to signal the speed alert is in effect */
-	activateDirAlertEventFlag		= 0x08, /* Flag to signal the direction alert is in effect */
-	activateBothAlertEventFlags		= 0x0C, /* Flag to signal both alerts are in effect */
-	deactivateSpeedAlertEventFlag	= 0x10, /* Flag to signal the speed alert is no longer in effect */
-	deactivateDirAlertEventFlag		= 0x20, /* Flag to signal the direction alert is no longer in effect */
-	deactivateBothAlertEventFlags	= 0x30, /* Flag to signal both alerts are no longer in effect */
-	LedOutputEventAllFlag			= 0x3C	/* All four LED OutPut event flags */
+	activateSpeedAlertEventFlag		= 0x020, /* Flag to signal the speed alert is in effect */
+	activateDirAlertEventFlag		= 0x040, /* Flag to signal the direction alert is in effect */
+	deactivateSpeedAlertEventFlag	= 0x080, /* Flag to signal the speed alert is no longer in effect */
+	deactivateDirAlertEventFlag		= 0x100, /* Flag to signal the direction alert is no longer in effect */
+	ledOutputEventAllFlag			= 0x1E0	 /* All four LED OutPut event flags */
 }vehicleEventFlags;
 
 

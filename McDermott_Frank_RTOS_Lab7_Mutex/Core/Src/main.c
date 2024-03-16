@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "FreeRTOSConfig.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -117,6 +118,8 @@ void systemClockOverride(void)
   */
 int main(void)
 {
+
+#include "SEGGER_SYSVIEW_FreeRTOS.h"
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
