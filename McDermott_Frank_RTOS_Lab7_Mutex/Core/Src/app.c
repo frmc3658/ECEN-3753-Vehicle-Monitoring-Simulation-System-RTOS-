@@ -379,7 +379,7 @@ vehicleDirection determineVehicleDirection(gyroRotationRate gyro)
 void updateLCD(uint8_t speed, vehicleDirection direction)
 {
 	char* speedText = "Speed: ";
-	char* dirText;
+	char* dirText = "";
 
 	while(1)
 	{
@@ -401,7 +401,6 @@ void updateLCD(uint8_t speed, vehicleDirection direction)
 				dirText = "Dir: Hard Right";
 				break;
 			default:
-				dirText = "";
 				break;
 		}
 
