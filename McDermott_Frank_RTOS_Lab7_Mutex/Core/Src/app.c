@@ -44,7 +44,8 @@ static const osThreadAttr_t vehicleMonitorTaskAttr = { .name = "vehicleMonitorTa
 													   .priority = osPriorityAboveNormal };
 /* Static Task: LCD Display */
 static osThreadId_t lcdDisplayTaskID;
-static const osThreadAttr_t lcdDisplayTaskAttr = { .name = "lcdDisplayTask" };
+static const osThreadAttr_t lcdDisplayTaskAttr = { .name = "lcdDisplayTask",
+												   .priority = osPriorityAboveNormal };
 
 #ifdef DEBUGGING
 /* Static Task: LED Output */
@@ -110,6 +111,8 @@ static const osEventFlagsAttr_t ledOutputEventFlagAttr = { .name = "ledOutputEve
 /* Static Bool: Buttons */
 static volatile bool buttonHeld = false;
 static volatile uint8_t directionAlertCallbackCount = 0;
+static volatile vehicleDirection currentDirection_LCD = drivingStraight;
+static volatile uint8_t currentSpeed_LCD = 0;
 
 /****************************************
  * 			Forward Declarations		*
@@ -145,7 +148,9 @@ static uint8_t getVehicleSpeed(void);
 static void getVehicleDirection(vehicleDirection* currentDirection, vehicleDirection* previousDirection);
 static void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection currentDirection);
 static void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehicleDirection currentDirection);
+#ifdef DEBUGGING
 static void updateLCD(uint8_t speed, vehicleDirection direction);
+#endif
 
 
 /****************************************
@@ -578,7 +583,7 @@ void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehic
 }
 
 
-
+#ifdef DEBUGGING
 /*
  * @brief Update LCD with speed an direction data
  *
@@ -622,6 +627,7 @@ void updateLCD(uint8_t speed, vehicleDirection direction)
 		LCD_DisplayString(10, 180, dirText);
 	}
 }
+#endif
 
 
 /********************************************
@@ -792,7 +798,7 @@ void lcdDisplayTask(void* arg)
 		osStatus_t mutexStatus = osMutexAcquire(speedDataMutexID, osWaitForever);
 		assert(mutexStatus == osOK);
 
-		uint8_t currentSpeed = speedData.speed;
+		currentSpeed_LCD = speedData.speed;
 
 		// Release the Speed Data Mutex
 		mutexStatus = osMutexRelease(speedDataMutexID);
@@ -802,14 +808,14 @@ void lcdDisplayTask(void* arg)
 		mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
 		assert(mutexStatus == osOK);
 
-		vehicleDirection currentDirection = directionData.direction;
+		currentDirection_LCD = directionData.direction;
 
 		// Release the Vehicle Direction Data Mutex
 		mutexStatus = osMutexRelease(vehicleDirDataMutexID);
 		assert(mutexStatus == osOK);
 
 		// Update the LCD with the current speed and direction
-		updateLCD(currentSpeed, currentDirection);
+//		updateLCD(currentSpeed, currentDirection);
 	}
 }
 
