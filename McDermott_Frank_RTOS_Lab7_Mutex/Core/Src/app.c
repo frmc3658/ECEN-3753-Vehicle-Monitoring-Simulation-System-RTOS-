@@ -40,14 +40,16 @@ static const osThreadAttr_t vehicleDirectionTaskAttr = { .name = "vehicleDirecti
 		  	  	  	  	  	  	  	  	  	  	  	  	 .priority = osPriorityHigh };
 /* Static Task: Veicle Monitor */
 static osThreadId_t vehicleMonitorTaskID;
-static const osThreadAttr_t vehicleMonitorTaskAttr = { .name = "vehicleMonitorTask" };
+static const osThreadAttr_t vehicleMonitorTaskAttr = { .name = "vehicleMonitorTask",
+													   .priority = osPriorityAboveNormal };
+/* Static Task: LCD Display */
+static osThreadId_t lcdDisplayTaskID;
+static const osThreadAttr_t lcdDisplayTaskAttr = { .name = "lcdDisplayTask" };
+
 #ifdef DEBUGGING
 /* Static Task: LED Output */
 static osThreadId_t ledOutputTaskID;
 static const osThreadAttr_t ledOutputTaskAttr = { .name = "ledOutputTask" };
-/* Static Task: LCD Display */
-static osThreadId_t lcdDisplayTaskID;
-static const osThreadAttr_t lcdDisplayTaskAttr = { .name = "lcdDisplayTask" };
 #endif
 
 /* ------------------ TIMERS ------------------------ */
@@ -60,11 +62,9 @@ static const osTimerAttr_t vehicleDirWakeupTimerAttr = { .name = "vehicleDirWake
 /* Static Timer: Direction Alert */
 static osTimerId_t directionAlertTimerID;
 static const osTimerAttr_t directionAlertTimerAttr = { .name = "directionAlertTimer" };
-#ifdef DEBUGGING
 /* Static Timer: LCD Display Task */
 static osTimerId_t lcdDisplayWakeupTimerID;
 static const osTimerAttr_t lcdDisplayWakeupTimerAttr = { .name = "lcdDisplayWakeupTimer" };
-#endif
 
 
 /* ------------------ SEMAPHORES ------------------------ */
@@ -80,14 +80,12 @@ static osSemaphoreId_t vehicleDirSemaphoreID;
 static const osSemaphoreAttr_t vehicleDirSemaphoreAttr = { .name = "vehicleDirSemaphore",
 														   .attr_bits = 0,
 														   .cb_mem = NULL };
-#ifdef DEBUGGING
 /* Static Semaphore: LCD Display */
-static StaticTask_t lcdDisplaySemaphoreTCB;
 static osSemaphoreId_t lcdDisplaySemaphoreID;
 static const osSemaphoreAttr_t lcdDisplaySemaphoreAttr = { .name = "lcdDisplaySemaphore",
 													       .attr_bits = 0,
 														   .cb_mem = NULL };
-#endif
+
 /* ------------------ MUTEXES ------------------------ */
 /* Static Mutex: Speed Data */
 static osMutexId_t speedDataMutexID;
@@ -121,18 +119,15 @@ static volatile uint8_t directionAlertCallbackCount = 0;
 static void speedSetpointTask(void* arg);
 static void vehicleDirectionTask(void* arg);
 static void vehicleMonitorTask(void* arg);
+static void lcdDisplayTask(void* arg);
 #ifdef DEBUGGING
 static void ledOutputTask(void* arg);
-static void lcdDisplayTask(void* arg);
 #endif
 /* Static Callback Functions */
 static void holdButtonTimerCallback(void* arg);
 static void vehicleDirWakeupTimerCallback(void* arg);
 static void directionAlertTimerCallback(void* arg);
-#ifdef DEBUGGING
 static void lcdDisplayWakeupTimerCallback(void* arg);
-#endif
-
 /* Static Helper Functions: Initialization */
 static void initTasks(void);
 static void initTimers(void);
@@ -150,9 +145,9 @@ static uint8_t getVehicleSpeed(void);
 static void getVehicleDirection(vehicleDirection* currentDirection, vehicleDirection* previousDirection);
 static void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection currentDirection);
 static void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehicleDirection currentDirection);
-#ifdef DEBUGGING
 static void updateLCD(uint8_t speed, vehicleDirection direction);
-#endif
+
+
 /****************************************
  *		Function Definitions: Public	*
  ****************************************/
@@ -194,8 +189,8 @@ void initTasks(void)
 	speedSetpointTaskID = osThreadNew(speedSetpointTask, NULL, &speedSetpointTaskAttr);
 	vehicleDirectionTaskID = osThreadNew(vehicleDirectionTask, NULL, &vehicleDirectionTaskAttr);
 	vehicleMonitorTaskID = osThreadNew(vehicleMonitorTask, NULL, &vehicleMonitorTaskAttr);
-	#ifdef DEBUGGING
 	lcdDisplayTaskID = osThreadNew(lcdDisplayTask, NULL, &lcdDisplayTaskAttr);
+	#ifdef DEBUGGING
 	ledOutputTaskID = osThreadNew(ledOutputTask, NULL, &ledOutputTaskAttr);
 	#endif
 
@@ -203,8 +198,8 @@ void initTasks(void)
 	assert(speedSetpointTaskID != NULL);
 	assert(vehicleDirectionTaskID != NULL);
 	assert(vehicleMonitorTaskID != NULL);
-	#ifdef DEBUGGING
 	assert(lcdDisplayTaskID != NULL);
+	#ifdef DEBUGGING
 	assert(ledOutputTaskID != NULL);
 	#endif
 }
@@ -219,17 +214,13 @@ void initTimers(void)
 	holdButtonTimerID = osTimerNew(holdButtonTimerCallback, osTimerOnce, NULL, &holdButtonTimerAttr);
 	vehicleDirWakeupTimerID = osTimerNew(vehicleDirWakeupTimerCallback, osTimerPeriodic, NULL, &vehicleDirWakeupTimerAttr);
 	directionAlertTimerID = osTimerNew(directionAlertTimerCallback, osTimerOnce, NULL, &directionAlertTimerAttr);
-	#ifdef DEBUGGING
 	lcdDisplayWakeupTimerID = osTimerNew(lcdDisplayWakeupTimerCallback, osTimerPeriodic, NULL, &lcdDisplayWakeupTimerAttr);
-	#endif
 
 	// Verify each of the timers was setup properly
 	assert(holdButtonTimerID != NULL);
 	assert(vehicleDirWakeupTimerID != NULL);
 	assert(directionAlertTimerID != NULL);
-	#ifdef DEBUGGING
 	assert(lcdDisplayWakeupTimerID != NULL);
-	#endif
 }
 
 
@@ -243,17 +234,13 @@ void initSempahores(void)
 										   &buttonStateSemaphorAttr);
 	vehicleDirSemaphoreID = osSemaphoreNew(MAKE_BINARY_SEMAPHORE, SEMAPHORE_ZERO_INIT_TOKENS,
 										   &vehicleDirSemaphoreAttr);
-	#ifdef DEBUGGING
 	lcdDisplaySemaphoreID = osSemaphoreNew(MAKE_BINARY_SEMAPHORE, SEMAPHORE_ZERO_INIT_TOKENS,
 										   &lcdDisplaySemaphoreAttr);
-	#endif
 
 	// Verify each semaphore was initialized sucessfully
 	assert(buttonStateSemaphorID != NULL);
 	assert(vehicleDirSemaphoreID != NULL);
-	#ifdef DEBUGGING
 	assert(lcdDisplaySemaphoreID != NULL);
-	#endif
 }
 
 
@@ -287,7 +274,6 @@ void initEventFlags(void)
 }
 
 
-
 /*
  * @brief Starts the task wakeup timers
  */
@@ -295,15 +281,11 @@ void startTimers(void)
 {
 	// Start task wakeup timers
 	osStatus_t dirWakeupTimerStatus = osTimerStart(vehicleDirWakeupTimerID, VEHICLE_DIR_WAKEUP_TIMER_TICKS);
-	#ifdef DEBUGGING
 	osStatus_t lcdWakeupTimerStatus = osTimerStart(lcdDisplayWakeupTimerID, LCD_DISPLAY_TIMER_TICKS);
-	#endif
 
 	// Verify that the timers were started successfully
 	assert(dirWakeupTimerStatus == osOK);
-	#ifdef DEBUGGING
 	assert(lcdWakeupTimerStatus == osOK);
-	#endif
 }
 
 
@@ -522,13 +504,13 @@ void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection curren
 	 * - Over limit, when making a turn. Suggested limit: 45 mph. */
 	if((currentSpeed > 75) || ((currentSpeed > 45) && (currentDirection != drivingStraight)))
 	{
-		osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
-//		assert(flags & ledOutputEventAllFlags);
+		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
+		assert(flags & ledOutputEventAllFlags);
 	}
 	else
 	{
-		osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
-//		assert(flags & ledOutputEventAllFlags);
+		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
+		assert(flags & ledOutputEventAllFlags);
 	}
 }
 
@@ -554,8 +536,8 @@ void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehic
 	   (currentRight && previouslyNotRight))		/* Vehicle is now turning right; but wasn't previously */
 	{
 		// Direction changed, so set the deactivate direction alert flag
-		osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
-//		assert(flags & ledOutputEventAllFlags);
+		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
+		assert(flags & ledOutputEventAllFlags);
 
 		// Since the vehicle is driving straight, it is not in danger
 		// of committing a direction violation. Therefore, stop the
@@ -632,6 +614,8 @@ void updateLCD(uint8_t speed, vehicleDirection direction)
 		}
 
 		LCD_Clear(0,LCD_COLOR_CYAN);
+		LCD_SetTextColor(LCD_COLOR_BLACK);
+		LCD_SetFont(&Font16x24);
 		LCD_DisplayString(10, 130, speedText);
 		LCD_DisplayNumber(100, 130, speed);
 		LCD_DisplayString(120, 130, "MPH");
@@ -664,9 +648,12 @@ void speedSetpointTask(void* arg)
 		osStatus_t semaphoreStatus = osSemaphoreAcquire(buttonStateSemaphorID, osWaitForever);
 		assert(semaphoreStatus == osOK);
 
-		// Start the oneshot hold button timer
-		osStatus_t status = osTimerStart(holdButtonTimerID, HOLD_BTN_TIMER_TICKS_1S);
-		assert(status == osOK);
+		if(!osTimerIsRunning(holdButtonTimerID))
+		{
+			// Start the oneshot hold button timer
+			osStatus_t status = osTimerStart(holdButtonTimerID, HOLD_BTN_TIMER_TICKS_1S);
+			assert(status == osOK);
+		}
 
 		// Pend on the button state semaphore (wait for the button to be released)
 		semaphoreStatus = osSemaphoreAcquire(buttonStateSemaphorID, osWaitForever);
@@ -675,7 +662,7 @@ void speedSetpointTask(void* arg)
 		// Stop the timer if it hasn't yet expired
 		if(osTimerIsRunning(holdButtonTimerID) == true)
 		{
-			status = osTimerStop(holdButtonTimerID);
+			osStatus_t status = osTimerStop(holdButtonTimerID);
 			assert(status == osOK);
 		}
 
@@ -786,6 +773,47 @@ void vehicleMonitorTask(void* arg)
 }
 
 
+/*
+ * @brief LCD Display Task
+ *
+ * @details
+ *
+ * @param[in] arg Dummy parameter for use with osThreadNew()
+ */
+void lcdDisplayTask(void* arg)
+{
+	while(1)
+	{
+		// Pend on the LCD Display Semaphore
+		osStatus_t status = osSemaphoreAcquire(lcdDisplaySemaphoreID, osWaitForever);
+		assert(status == osOK);
+
+		// Acquire the Speed Data Mutex
+		osStatus_t mutexStatus = osMutexAcquire(speedDataMutexID, osWaitForever);
+		assert(mutexStatus == osOK);
+
+		uint8_t currentSpeed = speedData.speed;
+
+		// Release the Speed Data Mutex
+		mutexStatus = osMutexRelease(speedDataMutexID);
+		assert(mutexStatus == osOK);
+
+		// Acquire the Vehicle Direction Data Mutex
+		mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
+		assert(mutexStatus == osOK);
+
+		vehicleDirection currentDirection = directionData.direction;
+
+		// Release the Vehicle Direction Data Mutex
+		mutexStatus = osMutexRelease(vehicleDirDataMutexID);
+		assert(mutexStatus == osOK);
+
+		// Update the LCD with the current speed and direction
+		updateLCD(currentSpeed, currentDirection);
+	}
+}
+
+
 #ifdef DEBUGGING
 /*
  * @brief LED Output Task
@@ -829,47 +857,6 @@ void ledOutputTask(void* arg)
 			default:
 				break;
 		}
-	}
-}
-
-
-/*
- * @brief LCD Display Task
- *
- * @details
- *
- * @param[in] arg Dummy parameter for use with osThreadNew()
- */
-void lcdDisplayTask(void* arg)
-{
-	while(1)
-	{
-		// Pend on the LCD Display Semaphore
-		osStatus_t status = osSemaphoreAcquire(lcdDisplaySemaphoreID, osWaitForever);
-		assert(status == osOK);
-
-		// Acquire the Speed Data Mutex
-		osStatus_t mutexStatus = osMutexAcquire(speedDataMutexID, osWaitForever);
-		assert(mutexStatus == osOK);
-
-		uint8_t currentSpeed = speedData.speed;
-
-		// Release the Speed Data Mutex
-		mutexStatus = osMutexRelease(speedDataMutexID);
-		assert(mutexStatus == osOK);
-
-		// Acquire the Vehicle Direction Data Mutex
-		mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
-		assert(mutexStatus == osOK);
-
-		vehicleDirection currentDirection = directionData.direction;
-
-		// Release the Vehicle Direction Data Mutex
-		mutexStatus = osMutexRelease(vehicleDirDataMutexID);
-		assert(mutexStatus == osOK);
-
-		// Update the LCD with the current speed and direction
-		updateLCD(currentSpeed, currentDirection);
 	}
 }
 #endif
@@ -953,8 +940,6 @@ void directionAlertTimerCallback(void* arg)
 }
 
 
-
-#ifdef DEBUGGING
 /*
  * @brief LCD Display Wakeup Timer Callback
  *
@@ -967,10 +952,13 @@ void lcdDisplayWakeupTimerCallback(void* arg)
 	// Avoids a compiler warning for unused parameter
 	(void) &arg;
 
+	SEGGER_SYSVIEW_RecordEnterTimer((uint32_t)lcdDisplayWakeupTimerID);
+
 	osStatus_t status = osSemaphoreRelease(lcdDisplaySemaphoreID);
 	assert(status == osOK);
+
+	SEGGER_SYSVIEW_RecordEnterTimer((uint32_t)lcdDisplayWakeupTimerID);
 }
-#endif
 
 
 /************************************************
