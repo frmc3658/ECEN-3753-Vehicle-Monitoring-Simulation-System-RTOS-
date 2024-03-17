@@ -138,9 +138,10 @@ static void initEventFlags(void);
 static void startTimers(void);
 static void lcdInit(void);
 /* Static Helper Functions: Vehicle Data */
-static void updateVehicleSpeedData(void);
+static void updateVehicleSpeedData(const int acceleration);
+static void updateVehicleDirectionData(const vehicleDirection newDirection);
 static gyroRotationRate getGyroRateOfRotation(void);
-static vehicleDirection determineVehicleDirection(gyroRotationRate gyro);
+static vehicleDirection determineVehicleDirection(const gyroRotationRate gyro);
 #ifdef DEBUGGING
 static void updateLCD(uint8_t speed, vehicleDirection direction);
 #endif
@@ -322,15 +323,8 @@ void lcdInit(void)
 /*
  *
  */
-void updateVehicleSpeedData(void)
+void updateVehicleSpeedData(const int acceleration)
 {
-	// Since the button was pressed, accelerate by 5
-	int acceleration = 5;
-
-	// If the button was held sufficiently long (1 second), flip the sign
-	// of acceleration (from 5 to -5) to signal deceleration
-	if(buttonHeld == true) { buttonHeld = false; acceleration *= -1; }
-
 	// Acquire the speed data mutex before reading the vehicle speed data
 	osStatus_t mutexStatus = osMutexAcquire(speedDataMutexID, osWaitForever);
 	assert(mutexStatus == osOK);
@@ -351,6 +345,43 @@ void updateVehicleSpeedData(void)
 	// speedData updated, release the mutex
 	mutexStatus = osMutexRelease(speedDataMutexID);
 	assert(mutexStatus == osOK);
+}
+
+
+/*
+ *
+ */
+void updateVehicleDirectionData(const vehicleDirection newDirection)
+{
+    // Acquire the vehicle direction data mutex
+    osStatus_t mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
+    assert(mutexStatus == osOK);
+
+    // Update the vehicle direction data
+    directionData.direction = newDirection;
+
+    // Update direction data turn counts
+    switch(newDirection)
+    {
+        case hardLeftTurn:
+            directionData.leftTurnCount += 2;
+            break;
+        case gradualLeftTurn:
+            directionData.leftTurnCount++;
+            break;
+        case gradualRightTurn:
+            directionData.rightTurnCount++;
+            break;
+        case hardRightTurn:
+            directionData.rightTurnCount += 2;
+            break;
+        default:
+            break;
+    }
+
+    // Release the vehicle direction data mutex
+    mutexStatus = osMutexRelease(vehicleDirDataMutexID);
+    assert(mutexStatus == osOK);
 }
 
 
@@ -410,7 +441,7 @@ gyroRotationRate getGyroRateOfRotation(void)
  *
  * @return Returns the direction that the vehicle is moving
  */
-vehicleDirection determineVehicleDirection(gyroRotationRate gyro)
+vehicleDirection determineVehicleDirection(const gyroRotationRate gyro)
 {
 	vehicleDirection direction;
 
@@ -520,7 +551,14 @@ void speedSetpointTask(void* arg)
 			assert(status == osOK);
 		}
 
-		updateVehicleSpeedData();
+		// Since the button was pressed, accelerate by 5
+        int acceleration = 5;
+
+        // If the button was held sufficiently long (1 second), flip the sign
+        // of acceleration (from 5 to -5) to signal deceleration
+        if(buttonHeld == true) { buttonHeld = false; acceleration *= -1; }
+
+		updateVehicleSpeedData(acceleration);
 
 		// Raise the speed update event flag to signal to the Vehicle Monitor
 		// Task that the speed has been updated
@@ -557,35 +595,7 @@ void vehicleDirectionTask(void* arg)
 		// Determine which direction the vehicle is moving
 		vehicleDirection newDirection = determineVehicleDirection(gyro);
 
-		// Acquire the vehicle direction data mutex
-		osStatus_t mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
-		assert(mutexStatus == osOK);
-
-		// Update the vehicle direction data
-		directionData.direction = newDirection;
-
-		// Update direction data turn counts
-		switch(newDirection)
-		{
-			case hardLeftTurn:
-				directionData.leftTurnCount += 2;
-				break;
-			case gradualLeftTurn:
-				directionData.leftTurnCount++;
-				break;
-			case gradualRightTurn:
-				directionData.rightTurnCount++;
-				break;
-			case hardRightTurn:
-				directionData.rightTurnCount += 2;
-				break;
-			default:
-				break;
-		}
-
-		// Release the vehicle direction data mutex
-		mutexStatus = osMutexRelease(vehicleDirDataMutexID);
-		assert(mutexStatus == osOK);
+		updateVehicleDirectionData(newDirection);
 
 		// Raise the Direction Update Flag to signal to the Vehicle
 		// Monitor Task that new vehicle direction data is available
@@ -593,6 +603,7 @@ void vehicleDirectionTask(void* arg)
 		assert(flags & directionUpdateEventFlag);
 	}
 }
+
 
 
 #ifdef DEBUGGING
