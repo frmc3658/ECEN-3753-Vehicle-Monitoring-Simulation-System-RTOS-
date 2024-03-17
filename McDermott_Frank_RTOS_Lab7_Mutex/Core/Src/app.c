@@ -47,11 +47,9 @@ static osThreadId_t lcdDisplayTaskID;
 static const osThreadAttr_t lcdDisplayTaskAttr = { .name = "lcdDisplayTask",
 												   .priority = osPriorityAboveNormal };
 
-#ifdef DEBUGGING
 /* Static Task: LED Output */
 static osThreadId_t ledOutputTaskID;
 static const osThreadAttr_t ledOutputTaskAttr = { .name = "ledOutputTask" };
-#endif
 
 /* ------------------ TIMERS ------------------------ */
 /* Static Timer: Hold Button */
@@ -123,9 +121,7 @@ static void speedSetpointTask(void* arg);
 static void vehicleDirectionTask(void* arg);
 static void vehicleMonitorTask(void* arg);
 static void lcdDisplayTask(void* arg);
-#ifdef DEBUGGING
 static void ledOutputTask(void* arg);
-#endif
 /* Static Callback Functions */
 static void holdButtonTimerCallback(void* arg);
 static void vehicleDirWakeupTimerCallback(void* arg);
@@ -195,18 +191,14 @@ void initTasks(void)
 	vehicleDirectionTaskID = osThreadNew(vehicleDirectionTask, NULL, &vehicleDirectionTaskAttr);
 	vehicleMonitorTaskID = osThreadNew(vehicleMonitorTask, NULL, &vehicleMonitorTaskAttr);
 	lcdDisplayTaskID = osThreadNew(lcdDisplayTask, NULL, &lcdDisplayTaskAttr);
-	#ifdef DEBUGGING
 	ledOutputTaskID = osThreadNew(ledOutputTask, NULL, &ledOutputTaskAttr);
-	#endif
 
 	// Verify that all task threads were created successfully
 	assert(speedSetpointTaskID != NULL);
 	assert(vehicleDirectionTaskID != NULL);
 	assert(vehicleMonitorTaskID != NULL);
 	assert(lcdDisplayTaskID != NULL);
-	#ifdef DEBUGGING
 	assert(ledOutputTaskID != NULL);
-	#endif
 }
 
 
@@ -748,15 +740,15 @@ void vehicleMonitorTask(void* arg)
 		// Pend on the Vehicle Monitor Event Flag
 		uint32_t eventStatus = osEventFlagsWait(vehicleMonitorEventFlagID, vehicleMonitorBothFlags,
 												osFlagsNoClear, osWaitForever);
-//		assert(eventStatus & vehicleMonitorBothFlags);
+		assert(eventStatus & vehicleMonitorBothFlags);
 
 
 		// Check if the speed update event flag is set
 		if(eventStatus & speedUpdateEventFlag)
 		{
 			// Manually clear the speed update event flag
-			osEventFlagsClear(vehicleMonitorEventFlagID, speedUpdateEventFlag);
-//			assert(flags & speedUpdateEventFlag);
+			uint32_t flags = osEventFlagsClear(vehicleMonitorEventFlagID, speedUpdateEventFlag);
+			assert(flags & vehicleMonitorBothFlags);
 
 			currentSpeed = getVehicleSpeed();
 		}
@@ -766,8 +758,8 @@ void vehicleMonitorTask(void* arg)
 		if(eventStatus & directionUpdateEventFlag)
 		{
 			// Manually clear the direction update event flag
-			osEventFlagsClear(vehicleMonitorEventFlagID, directionUpdateEventFlag);
-//			assert(flags & directionUpdateEventFlag);
+			uint32_t flags = osEventFlagsClear(vehicleMonitorEventFlagID, directionUpdateEventFlag);
+			assert(flags & vehicleMonitorBothFlags);
 
 			getVehicleDirection(&previousDirection, &currentDirection);
 		}
@@ -820,7 +812,6 @@ void lcdDisplayTask(void* arg)
 }
 
 
-#ifdef DEBUGGING
 /*
  * @brief LED Output Task
  *
@@ -837,35 +828,35 @@ void ledOutputTask(void* arg)
 	{
 		// Pend on the alert update event flag
 		uint32_t flags = osEventFlagsWait(ledOutputEventFlagID, ledOutputEventAllFlags,
-										  osFlagsWaitAny, osWaitForever);
+										  osFlagsNoClear, osWaitForever);
 
-//		assert(flags & ledOutputEventAllFlags);
+		assert(flags & ledOutputEventAllFlags);
 
 		// Drive the LEDs according to which flag was set
-		switch(flags)
+		if(flags & activateSpeedAlertEventFlag)
 		{
-			// Activate Speed Violation: Turn on green LED (LED3)
-			case activateSpeedAlertEventFlag:
-				HAL_GPIO_WritePin(GREEN_LED_PORT, GREEN_LED_PIN, GPIO_PIN_SET);
-				break;
-			// Activate Direction Violation: Turn on red LED (LED4)
-			case activateDirAlertEventFlag:
-				HAL_GPIO_WritePin(RED_LED_PORT, RED_LED_PIN, GPIO_PIN_SET);
-				break;
-			// Deactivate Speed Violation: Turn off green LED (LED3)
-			case deactivateSpeedAlertEventFlag:
-				HAL_GPIO_WritePin(GREEN_LED_PORT, GREEN_LED_PIN, GPIO_PIN_RESET);
-				break;
-			// Deactivate Direction Violation: Turn off red LED (LED4)
-			case deactivateDirAlertEventFlag:
-				HAL_GPIO_WritePin(RED_LED_PORT, RED_LED_PIN, GPIO_PIN_RESET);
-				break;
-			default:
-				break;
+			flags = osEventFlagsClear(ledOutputEventFlagID, activateSpeedAlertEventFlag);
+			HAL_GPIO_WritePin(GREEN_LED_PORT, GREEN_LED_PIN, GPIO_PIN_SET);
 		}
+		else if(flags & activateDirAlertEventFlag)
+		{
+			flags = osEventFlagsClear(ledOutputEventFlagID, activateDirAlertEventFlag);
+			HAL_GPIO_WritePin(RED_LED_PORT, RED_LED_PIN, GPIO_PIN_SET);
+		}
+		else if(flags & deactivateSpeedAlertEventFlag)
+		{
+			flags = osEventFlagsClear(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
+			HAL_GPIO_WritePin(GREEN_LED_PORT, GREEN_LED_PIN, GPIO_PIN_RESET);
+		}
+		else if(flags & deactivateDirAlertEventFlag)
+		{
+			flags = osEventFlagsClear(ledOutputEventFlagID, deactivateDirAlertEventFlag);
+			HAL_GPIO_WritePin(RED_LED_PORT, RED_LED_PIN, GPIO_PIN_RESET);
+		}
+
+		assert(flags & ledOutputEventAllFlags);
 	}
 }
-#endif
 
 
 /********************************************************
