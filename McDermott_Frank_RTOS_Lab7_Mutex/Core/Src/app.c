@@ -36,10 +36,10 @@ static const osThreadAttr_t speedSetpointTaskAttr = { .name = "speedSetpointTask
 /* Static Task: Vehicle Direction */
 static osThreadId_t vehicleDirectionTaskID;
 static const osThreadAttr_t vehicleDirectionTaskAttr = { .name = "vehicleDirectionTask" };
-#ifdef DEBUGGING
 /* Static Task: Veicle Monitor */
 static osThreadId_t vehicleMonitorTaskID;
 static const osThreadAttr_t vehicleMonitorTaskAttr = { .name = "vehicleMonitorTask" };
+#ifdef DEBUGGING
 /* Static Task: LED Output */
 static osThreadId_t ledOutputTaskID;
 static const osThreadAttr_t ledOutputTaskAttr = { .name = "ledOutputTask" };
@@ -55,13 +55,13 @@ static const osTimerAttr_t holdButtonTimerAttr = { .name = "holdButtonTimer" };
 /* Static Timer: Vehicle Direction Task */
 static osTimerId_t vehicleDirWakeupTimerID;
 static const osTimerAttr_t vehicleDirWakeupTimerAttr = { .name = "vehicleDirWakeupTimer" };
+/* Static Timer: Direction Alert */
+static osTimerId_t directionAlertTimerID;
+static const osTimerAttr_t directionAlertTimerAttr = { .name = "directionAlertTimer" };
 #ifdef DEBUGGING
 /* Static Timer: LCD Display Task */
 static osTimerId_t lcdDisplayWakeupTimerID;
 static const osTimerAttr_t lcdDisplayWakeupTimerAttr = { .name = "lcdDisplayWakeupTimer" };
-/* Static Timer: Direction Alert */
-static osTimerId_t directionAlertTimerID;
-static const osTimerAttr_t directionAlertTimerAttr = { .name = "directionAlertTimer" };
 #endif
 
 
@@ -80,7 +80,7 @@ static const osSemaphoreAttr_t vehicleDirSemaphoreAttr = { .name = "vehicleDirSe
 														   .cb_mem = NULL };
 #ifdef DEBUGGING
 /* Static Semaphore: LCD Display */
-//static StaticTask_t lcdDisplaySemaphoreTCB;
+static StaticTask_t lcdDisplaySemaphoreTCB;
 static osSemaphoreId_t lcdDisplaySemaphoreID;
 static const osSemaphoreAttr_t lcdDisplaySemaphoreAttr = { .name = "lcdDisplaySemaphore",
 													       .attr_bits = 0,
@@ -99,12 +99,10 @@ static const osMutexAttr_t vehicleDirDataMutexAttr = { .name = "vehicleDirDataMu
 /* Static Event Flag: Vehicle Monitor */
 static osEventFlagsId_t vehicleMonitorEventFlagID;
 static const osEventFlagsAttr_t vehicleMonitorEventFlagAttr = { .name = "vehicleMonitorEventFlag" };
-
-#ifdef DEBUGGING
 /* Static Event Flag: LCD Output */
 static osEventFlagsId_t ledOutputEventFlagID;
 static const osEventFlagsAttr_t ledOutputEventFlagAttr = { .name = "ledOutputEventFlag" };
-#endif
+
 
 /* ------------------ BOOLEANS ------------------------ */
 /* Static Bool: Buttons */
@@ -117,18 +115,19 @@ static volatile bool buttonHeld = false;
 /* Static Task Functions */
 static void speedSetpointTask(void* arg);
 static void vehicleDirectionTask(void* arg);
-#ifdef DEBUGGING
 static void vehicleMonitorTask(void* arg);
+#ifdef DEBUGGING
 static void ledOutputTask(void* arg);
 static void lcdDisplayTask(void* arg);
 #endif
 /* Static Callback Functions */
 static void holdButtonTimerCallback(void* arg);
 static void vehicleDirWakeupTimerCallback(void* arg);
+static void directionAlertTimerCallback(void* arg);
 #ifdef DEBUGGING
 static void lcdDisplayWakeupTimerCallback(void* arg);
-static void directionAlertTimerCallback(void* arg);
 #endif
+
 /* Static Helper Functions: Initialization */
 static void initTasks(void);
 static void initTimers(void);
@@ -142,6 +141,10 @@ static void updateVehicleSpeedData(const int acceleration);
 static void updateVehicleDirectionData(const vehicleDirection newDirection);
 static gyroRotationRate getGyroRateOfRotation(void);
 static vehicleDirection determineVehicleDirection(const gyroRotationRate gyro);
+static uint8_t getVehicleSpeed(void);
+static void getVehicleDirection(vehicleDirection* currentDirection, vehicleDirection* previousDirection);
+static void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection currentDirection);
+static void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehicleDirection currentDirection);
 #ifdef DEBUGGING
 static void updateLCD(uint8_t speed, vehicleDirection direction);
 #endif
@@ -185,19 +188,17 @@ void initTasks(void)
 	// Create new task threads
 	speedSetpointTaskID = osThreadNew(speedSetpointTask, NULL, &speedSetpointTaskAttr);
 	vehicleDirectionTaskID = osThreadNew(vehicleDirectionTask, NULL, &vehicleDirectionTaskAttr);
-	#ifdef DEBUGGING
 	vehicleMonitorTaskID = osThreadNew(vehicleMonitorTask, NULL, &vehicleMonitorTaskAttr);
+	#ifdef DEBUGGING
 	lcdDisplayTaskID = osThreadNew(lcdDisplayTask, NULL, &lcdDisplayTaskAttr);
 	ledOutputTaskID = osThreadNew(ledOutputTask, NULL, &ledOutputTaskAttr);
 	#endif
 
 	// Verify that all task threads were created successfully
 	assert(speedSetpointTaskID != NULL);
-
-
 	assert(vehicleDirectionTaskID != NULL);
-	#ifdef DEBUGGING
 	assert(vehicleMonitorTaskID != NULL);
+	#ifdef DEBUGGING
 	assert(lcdDisplayTaskID != NULL);
 	assert(ledOutputTaskID != NULL);
 	#endif
@@ -212,17 +213,17 @@ void initTimers(void)
 	// Create timers
 	holdButtonTimerID = osTimerNew(holdButtonTimerCallback, osTimerOnce, NULL, &holdButtonTimerAttr);
 	vehicleDirWakeupTimerID = osTimerNew(vehicleDirWakeupTimerCallback, osTimerPeriodic, NULL, &vehicleDirWakeupTimerAttr);
+	directionAlertTimerID = osTimerNew(directionAlertTimerCallback, osTimerOnce, NULL, &directionAlertTimerAttr);
 	#ifdef DEBUGGING
 	lcdDisplayWakeupTimerID = osTimerNew(lcdDisplayWakeupTimerCallback, osTimerPeriodic, NULL, &lcdDisplayWakeupTimerAttr);
-	directionAlertTimerID = osTimerNew(directionAlertTimerCallback, osTimerOnce, NULL, &directionAlertTimerAttr);
 	#endif
 
 	// Verify each of the timers was setup properly
 	assert(holdButtonTimerID != NULL);
 	assert(vehicleDirWakeupTimerID != NULL);
+	assert(directionAlertTimerID != NULL);
 	#ifdef DEBUGGING
 	assert(lcdDisplayWakeupTimerID != NULL);
-	assert(directionAlertTimerID != NULL);
 	#endif
 }
 
@@ -273,17 +274,11 @@ void initEventFlags(void)
 {
 	// Create app event flags
 	vehicleMonitorEventFlagID = osEventFlagsNew(&vehicleMonitorEventFlagAttr);
-
-	#ifdef DEBUGGING
 	ledOutputEventFlagID = osEventFlagsNew(&ledOutputEventFlagAttr);
-	#endif
 
 	// Verify that the event flags were created successfully
 	assert(vehicleMonitorEventFlagID != NULL);
-
-	#ifdef DEBUGGING
 	assert(ledOutputEventFlagID != NULL);
-	#endif
 }
 
 
@@ -470,6 +465,131 @@ vehicleDirection determineVehicleDirection(const gyroRotationRate gyro)
 
 
 /*
+ *
+ */
+uint8_t getVehicleSpeed(void)
+{
+	// Acquire the vehicle speed data mutex before trying to
+	// read vehicle speed data
+	osStatus_t mutexStatus = osMutexAcquire(speedDataMutexID, osWaitForever);
+	assert(mutexStatus == osOK);
+
+	// Update speed data
+	uint8_t currentSpeed = speedData.speed;
+
+	// Done reading vehicle speed data; release the vehicle
+	// speed data mutex
+	mutexStatus = osMutexRelease(speedDataMutexID);
+	assert(mutexStatus == osOK);
+
+	return currentSpeed;
+}
+
+
+/*
+ *
+ */
+void getVehicleDirection(vehicleDirection* currentDirection, vehicleDirection* previousDirection)
+{
+	// Acquire the vehicle direction data mutex before trying to
+	// read vehicle direction data
+	osStatus_t mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
+	assert(mutexStatus == osOK);
+
+	// Update directional data
+	*previousDirection = *currentDirection;
+	*currentDirection = directionData.direction;
+
+	// Done reading vehicle direction data; release the vehicle
+	// direction data mutex
+	mutexStatus = osMutexRelease(vehicleDirDataMutexID);
+	assert(mutexStatus == osOK);
+}
+
+
+/*
+ *
+ */
+void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection currentDirection)
+{
+	/* Speed Violation – Light LED3 (green) for the following warnings:
+	 * - Over limit, regardless of direction. Suggested limit: 75 mph.
+	 * - Over limit, when making a turn. Suggested limit: 45 mph. */
+	if((currentSpeed > 75) || ((currentSpeed > 45) && (currentDirection != drivingStraight)))
+	{
+		osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
+//			assert(flagStatus & speedAndDirectionEventFlags);
+	}
+	else
+	{
+		osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
+//			assert(flagStatus & deactivateBothAlertEventFlags);
+	}
+}
+
+
+
+void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehicleDirection currentDirection)
+{
+	// Makes the compound conditional easier to read
+	bool currentLeft = (currentDirection < drivingStraight);
+	bool previouslyNotLeft = (previousDirection >= drivingStraight);
+	bool currentRight = (currentDirection > drivingStraight);
+	bool previouslyNotRight = (previousDirection <= drivingStraight);
+
+	// Check if the vehicle has changed direction
+	// NOTE: The direction alert timer is started/restarted when the
+	//		 vehicle changes direction. It is only stopped when driving
+	//		 straight.
+	if((currentDirection == drivingStraight) 	||	/* Vehicle is now driving straight */
+	   (currentLeft && previouslyNotLeft) 		||	/* Vehicle is now turning left; but wasn't previously */
+	   (currentRight && previouslyNotRight))		/* Vehicle is now turning right; but wasn't previously */
+	{
+		// Direction changed, so set the deactivate direction alert flag
+		osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
+//			assert(flagStatus & deactivateBothAlertEventFlags);
+
+		// Since the vehicle is driving straight, it is not in danger
+		// of committing a direction violation. Therefore, stop the
+		// direction alert timer
+		if(currentDirection == drivingStraight)
+		{
+			// Stop timer if running
+			// NOTE: osTimerStop will return osErrorResource if
+			// 		 the timer is not running
+			if(osTimerIsRunning(directionAlertTimerID))
+			{
+				osStatus_t stopStatus = osTimerStop(directionAlertTimerID);
+				assert(stopStatus == osOK);
+			}
+		}
+		// While the vehicle did change direction, it is still in the process
+		// of taking a turn. Therefore, restart the direction alert timer
+		else
+		{
+			// NOTE: If the callback is called (after 5 seconds), then the direction
+			// 		 alert event flag is raised and the proper LED is turned on via
+			//		 the LED Output Task.
+
+			/* Direction Violation – Light LED4 (red) for the following warnings:
+			 * - Potential collision alert if constantly turning for more
+			 *   than a predefined time limit. Suggested limit: 5 seconds.
+			 * - Treat both gradual and hard turns as the same direction.	*/
+			if(osTimerIsRunning(directionAlertTimerID))
+			{
+				osStatus_t stopStatus = osTimerStop(directionAlertTimerID);
+				assert(stopStatus == osOK);
+			}
+
+			osStatus_t startStatus = osTimerStart(directionAlertTimerID, DIRECTION_ALERT_TIMER_TICKS);
+			assert(startStatus == osOK);
+		}
+	}
+}
+
+
+
+/*
  * @brief Update LCD with speed an direction data
  *
  * @param[in] speed Speed data to diplay on the LCD
@@ -606,7 +726,6 @@ void vehicleDirectionTask(void* arg)
 
 
 
-#ifdef DEBUGGING
 /*
  * @brief Vehicle Monitor Task
  *
@@ -627,119 +746,39 @@ void vehicleMonitorTask(void* arg)
 	{
 		// Pend on the Vehicle Monitor Event Flag
 		uint32_t eventStatus = osEventFlagsWait(vehicleMonitorEventFlagID, vehicleMonitorBothFlags,
-												osFlagsWaitAny, osWaitForever);
+												osFlagsNoClear, osWaitForever);
+		assert(eventStatus & vehicleMonitorBothFlags);
 
 
 		// Check if the speed update event flag is set
 		if(eventStatus & speedUpdateEventFlag)
 		{
-			// Acquire the vehicle speed data mutex before trying to
-			// read vehicle speed data
-		    osStatus_t mutexStatus = osMutexAcquire(speedDataMutexID, osWaitForever);
-		    assert(mutexStatus == osOK);
+			// Munually clear the speed update event flag
+			uint32_t flags = osEventFlagsClear(vehicleMonitorEventFlagID, speedUpdateEventFlag);
+			assert(flags & speedUpdateEventFlag);
 
-		    // Update speed data
-		    currentSpeed = speedData.speed;
-
-		    // Done reading vehicle speed data; release the vehicle
-		    // speed data mutex
-		    mutexStatus = osMutexRelease(speedDataMutexID);
-		    assert(mutexStatus == osOK);
+			currentSpeed = getVehicleSpeed();
 		}
 
 
 		// Check if the direction update event flag is set
 		if(eventStatus & directionUpdateEventFlag)
 		{
-			// Acquire the vehicle direction data mutex before trying to
-			// read vehicle direction data
-			osStatus_t mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
-		    assert(mutexStatus == osOK);
+			// Munually clear the direction update event flag
+			uint32_t flags = osEventFlagsClear(vehicleMonitorEventFlagID, directionUpdateEventFlag);
+			assert(flags & directionUpdateEventFlag);
 
-		    // Update directional data
-		    previousDirection = currentDirection;
-		    currentDirection = directionData.direction;
-
-		    // Done reading vehicle direction data; release the vehicle
-		    // direction data mutex
-		    mutexStatus = osMutexRelease(vehicleDirDataMutexID);
-		    assert(mutexStatus == osOK);
+			getVehicleDirection(&previousDirection, &currentDirection);
 		}
 
-		/* Speed Violation – Light LED3 (green) for the following warnings:
-		 * - Over limit, regardless of direction. Suggested limit: 75 mph.
-		 * - Over limit, when making a turn. Suggested limit: 45 mph. */
-		if((currentSpeed > 75) || ((currentSpeed > 45) && (currentDirection != drivingStraight)))
-		{
-			osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
-//			assert(flagStatus & speedAndDirectionEventFlags);
-		}
-		else
-		{
-			osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
-//			assert(flagStatus & deactivateBothAlertEventFlags);
-		}
-
-		// Makes the compound conditional easier to read
-		bool currentLeft = (currentDirection < drivingStraight);
-		bool previouslyNotLeft = (previousDirection >= drivingStraight);
-		bool currentRight = (currentDirection > drivingStraight);
-		bool previouslyNotRight = (previousDirection <= drivingStraight);
-
-
-		// Check if the vehicle has changed direction
-		// NOTE: The direction alert timer is started/restarted when the
-		//		 vehicle changes direction. It is only stopped when driving
-		//		 straight.
-		if((currentDirection == drivingStraight) 	||	/* Vehicle is now driving straight */
-		   (currentLeft && previouslyNotLeft) 		||	/* Vehicle is now turning left; but wasn't previously */
-		   (currentRight && previouslyNotRight))		/* Vehicle is now turning right; but wasn't previously */
-		{
-			// Direction changed, so set the deactivate direction alert flag
-			osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
-//			assert(flagStatus & deactivateBothAlertEventFlags);
-
-			// Since the vehicle is driving straight, it is not in danger
-			// of committing a direction violation. Therefore, stop the
-			// direction alert timer
-			if(currentDirection == drivingStraight)
-			{
-				// Stop timer if running
-				// NOTE: osTimerStop will return osErrorResource if
-				// 		 the timer is not running
-				if(osTimerIsRunning(directionAlertTimerID))
-				{
-					osStatus_t stopStatus = osTimerStop(directionAlertTimerID);
-					assert(stopStatus == osOK);
-				}
-			}
-			// While the vehicle did change direction, it is still in the process
-			// of taking a turn. Therefore, restart the direction alert timer
-			else
-			{
-				// NOTE: If the callback is called (after 5 seconds), then the direction
-				// 		 alert event flag is raised and the proper LED is turned on via
-				//		 the LED Output Task.
-
-				/* Direction Violation – Light LED4 (red) for the following warnings:
-				 * - Potential collision alert if constantly turning for more
-				 *   than a predefined time limit. Suggested limit: 5 seconds.
-				 * - Treat both gradual and hard turns as the same direction.	*/
-				if(osTimerIsRunning(directionAlertTimerID))
-				{
-					osStatus_t stopStatus = osTimerStop(directionAlertTimerID);
-					assert(stopStatus == osOK);
-				}
-
-				osStatus_t startStatus = osTimerStart(directionAlertTimerID, DIRECTION_ALERT_TIMER_TICKS);
-				assert(startStatus == osOK);
-			}
-		}
+		// Check for vehicle speed and/or direction violations
+		checkForVehicleSpeedViolation(currentSpeed, currentDirection);
+		checkForVehicleDirectionViolation(previousDirection, currentDirection);
 	}
 }
 
 
-
+#ifdef DEBUGGING
 /*
  * @brief LED Output Task
  *
@@ -867,26 +906,12 @@ void vehicleDirWakeupTimerCallback(void* arg)
 	// Avoids a compiler warning for unused parameter
 	(void) &arg;
 
+	SEGGER_SYSVIEW_RecordEnterTimer((uint32_t)vehicleDirWakeupTimerID);
+
 	osStatus_t status = osSemaphoreRelease(vehicleDirSemaphoreID);
 	assert(status == osOK);
-}
 
-
-#ifdef DEBUGGING
-/*
- * @brief LCD Display Wakeup Timer Callback
- *
- * @details
- *
- * @param[in] arg Dummy parameter for use with osTimerNew()
- */
-void lcdDisplayWakeupTimerCallback(void* arg)
-{
-	// Avoids a compiler warning for unused parameter
-	(void) &arg;
-
-	osStatus_t status = osSemaphoreRelease(lcdDisplaySemaphoreID);
-	assert(status == osOK);
+	SEGGER_SYSVIEW_RecordExitTimer();
 }
 
 
@@ -908,8 +933,32 @@ void directionAlertTimerCallback(void* arg)
 	// Avoids a compiler warning for unused parameter
 	(void) &arg;
 
+	SEGGER_SYSVIEW_RecordEnterTimer((uint32_t)directionAlertTimerID);
+
 	osEventFlagsSet(ledOutputEventFlagID, activateDirAlertEventFlag);
 //	assert(flagStatus & speedAndDirectionEventFlags);
+
+	SEGGER_SYSVIEW_RecordExitTimer();
+
+}
+
+
+
+#ifdef DEBUGGING
+/*
+ * @brief LCD Display Wakeup Timer Callback
+ *
+ * @details
+ *
+ * @param[in] arg Dummy parameter for use with osTimerNew()
+ */
+void lcdDisplayWakeupTimerCallback(void* arg)
+{
+	// Avoids a compiler warning for unused parameter
+	(void) &arg;
+
+	osStatus_t status = osSemaphoreRelease(lcdDisplaySemaphoreID);
+	assert(status == osOK);
 }
 #endif
 
