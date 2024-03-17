@@ -84,7 +84,7 @@ typedef enum
 	activateDirAlertEventFlag		= 0x040, /* Flag to signal the direction alert is in effect */
 	deactivateSpeedAlertEventFlag	= 0x080, /* Flag to signal the speed alert is no longer in effect */
 	deactivateDirAlertEventFlag		= 0x100, /* Flag to signal the direction alert is no longer in effect */
-	ledOutputEventAllFlag			= 0x1E0	 /* All four LED OutPut event flags */
+	ledOutputEventAllFlags			= 0x1E0	 /* All four LED OutPut event flags */
 }vehicleEventFlags;
 
 

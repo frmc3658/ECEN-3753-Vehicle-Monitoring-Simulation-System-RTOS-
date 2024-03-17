@@ -107,6 +107,7 @@ static const osEventFlagsAttr_t ledOutputEventFlagAttr = { .name = "ledOutputEve
 /* ------------------ BOOLEANS ------------------------ */
 /* Static Bool: Buttons */
 static volatile bool buttonHeld = false;
+static volatile uint8_t directionAlertCallbackCount = 0;
 
 /****************************************
  * 			Forward Declarations		*
@@ -517,13 +518,13 @@ void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection curren
 	 * - Over limit, when making a turn. Suggested limit: 45 mph. */
 	if((currentSpeed > 75) || ((currentSpeed > 45) && (currentDirection != drivingStraight)))
 	{
-		osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
-//			assert(flagStatus & speedAndDirectionEventFlags);
+		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
+		assert(flags & ledOutputEventAllFlags);
 	}
 	else
 	{
-		osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
-//			assert(flagStatus & deactivateBothAlertEventFlags);
+		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
+		assert(flags & ledOutputEventAllFlags);
 	}
 }
 
@@ -546,8 +547,8 @@ void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehic
 	   (currentRight && previouslyNotRight))		/* Vehicle is now turning right; but wasn't previously */
 	{
 		// Direction changed, so set the deactivate direction alert flag
-		osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
-//			assert(flagStatus & deactivateBothAlertEventFlags);
+		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
+		assert(flags & ledOutputEventAllFlags);
 
 		// Since the vehicle is driving straight, it is not in danger
 		// of committing a direction violation. Therefore, stop the
@@ -794,10 +795,10 @@ void ledOutputTask(void* arg)
 	while(1)
 	{
 		// Pend on the alert update event flag
-		uint32_t flags = osEventFlagsWait(ledOutputEventFlagID, ledOutputEventAllFlag,
+		uint32_t flags = osEventFlagsWait(ledOutputEventFlagID, ledOutputEventAllFlags,
 										  osFlagsWaitAny, osWaitForever);
 
-//		assert(flags & LedOutputEventAllFlag);
+//		assert(flags & ledOutputEventAllFlags);
 
 		// Drive the LEDs according to which flag was set
 		switch(flags)
@@ -935,8 +936,10 @@ void directionAlertTimerCallback(void* arg)
 
 	SEGGER_SYSVIEW_RecordEnterTimer((uint32_t)directionAlertTimerID);
 
-	osEventFlagsSet(ledOutputEventFlagID, activateDirAlertEventFlag);
-//	assert(flagStatus & speedAndDirectionEventFlags);
+	directionAlertCallbackCount++;
+
+	uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, activateDirAlertEventFlag);
+	assert(flags & ledOutputEventAllFlags);
 
 	SEGGER_SYSVIEW_RecordExitTimer();
 
