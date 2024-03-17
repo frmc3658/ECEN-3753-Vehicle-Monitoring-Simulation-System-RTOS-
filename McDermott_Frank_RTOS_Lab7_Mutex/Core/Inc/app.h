@@ -37,7 +37,7 @@
 #define HOLD_BTN_TIMER_TICKS_1S				(uint32_t)1000	/* 1 second timer period */
 #define VEHICLE_DIR_WAKEUP_TIMER_TICKS		(uint32_t)100	/* 100ms timer period */
 #define DIRECTION_ALERT_TIMER_TICKS			(uint32_t)1000	/* 5 second timer period */
-#define LCD_DISPLAY_TIMER_TICKS				(uint32_t)200	/* 100ms timer period */
+#define LCD_DISPLAY_TIMER_TICKS				(uint32_t)500	/* 100ms timer period */
 /* Semaphore Definitions */
 #define MAKE_BINARY_SEMAPHORE				1	/* A max count value of 1 creates a binary semaphore */
 #define SEMAPHORE_ZERO_INIT_TOKENS			0	/* Initialize sempahore token count to zero */
