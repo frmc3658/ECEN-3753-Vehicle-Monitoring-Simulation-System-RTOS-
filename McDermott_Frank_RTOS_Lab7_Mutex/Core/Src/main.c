@@ -151,7 +151,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   HAL_NVIC_EnableIRQ(BUTTON_IRQn);
-  NVIC_SetPriority(BUTTON_IRQn, 13);
+  NVIC_SetPriority(BUTTON_IRQn, osPriorityISR);
 
 
   /* USER CODE END 2 */

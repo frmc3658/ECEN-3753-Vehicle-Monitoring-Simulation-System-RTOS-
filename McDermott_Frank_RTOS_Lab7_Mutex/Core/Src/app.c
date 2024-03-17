@@ -32,10 +32,12 @@ static struct VehicleDirectionData_t
 /* ------------------ TASKS ------------------------ */
 /* Static Task: Speed Setpoint */
 static osThreadId_t speedSetpointTaskID;
-static const osThreadAttr_t speedSetpointTaskAttr = { .name = "speedSetpointTask" };
+static const osThreadAttr_t speedSetpointTaskAttr = { .name = "speedSetpointTask",
+													  .priority = osPriorityHigh };
 /* Static Task: Vehicle Direction */
 static osThreadId_t vehicleDirectionTaskID;
-static const osThreadAttr_t vehicleDirectionTaskAttr = { .name = "vehicleDirectionTask" };
+static const osThreadAttr_t vehicleDirectionTaskAttr = { .name = "vehicleDirectionTask",
+		  	  	  	  	  	  	  	  	  	  	  	  	 .priority = osPriorityHigh };
 /* Static Task: Veicle Monitor */
 static osThreadId_t vehicleMonitorTaskID;
 static const osThreadAttr_t vehicleMonitorTaskAttr = { .name = "vehicleMonitorTask" };
@@ -89,11 +91,13 @@ static const osSemaphoreAttr_t lcdDisplaySemaphoreAttr = { .name = "lcdDisplaySe
 /* ------------------ MUTEXES ------------------------ */
 /* Static Mutex: Speed Data */
 static osMutexId_t speedDataMutexID;
-static const osMutexAttr_t speedDataMutexAttr = { .name = "speedDataMutex" };
+static const osMutexAttr_t speedDataMutexAttr = { .name = "speedDataMutex",
+												  .attr_bits = osMutexPrioInherit };
 
 /* Static Mutex: Vehicle Direction Data */
 static osMutexId_t vehicleDirDataMutexID;
-static const osMutexAttr_t vehicleDirDataMutexAttr = { .name = "vehicleDirDataMutex" };
+static const osMutexAttr_t vehicleDirDataMutexAttr = { .name = "vehicleDirDataMutex",
+		  	  	  	  	  	  	  	  	  	  	  	   .attr_bits = osMutexPrioInherit };
 
 /* ------------------ EVENT FLAGS ------------------------ */
 /* Static Event Flag: Vehicle Monitor */
@@ -518,18 +522,21 @@ void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection curren
 	 * - Over limit, when making a turn. Suggested limit: 45 mph. */
 	if((currentSpeed > 75) || ((currentSpeed > 45) && (currentDirection != drivingStraight)))
 	{
-		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
-		assert(flags & ledOutputEventAllFlags);
+		osEventFlagsSet(ledOutputEventFlagID, activateSpeedAlertEventFlag);
+//		assert(flags & ledOutputEventAllFlags);
 	}
 	else
 	{
-		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
-		assert(flags & ledOutputEventAllFlags);
+		osEventFlagsSet(ledOutputEventFlagID, deactivateSpeedAlertEventFlag);
+//		assert(flags & ledOutputEventAllFlags);
 	}
 }
 
 
 
+/*
+ *
+ */
 void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehicleDirection currentDirection)
 {
 	// Makes the compound conditional easier to read
@@ -547,8 +554,8 @@ void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehic
 	   (currentRight && previouslyNotRight))		/* Vehicle is now turning right; but wasn't previously */
 	{
 		// Direction changed, so set the deactivate direction alert flag
-		uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
-		assert(flags & ledOutputEventAllFlags);
+		osEventFlagsSet(ledOutputEventFlagID, deactivateDirAlertEventFlag);
+//		assert(flags & ledOutputEventAllFlags);
 
 		// Since the vehicle is driving straight, it is not in danger
 		// of committing a direction violation. Therefore, stop the
@@ -748,15 +755,15 @@ void vehicleMonitorTask(void* arg)
 		// Pend on the Vehicle Monitor Event Flag
 		uint32_t eventStatus = osEventFlagsWait(vehicleMonitorEventFlagID, vehicleMonitorBothFlags,
 												osFlagsNoClear, osWaitForever);
-		assert(eventStatus & vehicleMonitorBothFlags);
+//		assert(eventStatus & vehicleMonitorBothFlags);
 
 
 		// Check if the speed update event flag is set
 		if(eventStatus & speedUpdateEventFlag)
 		{
-			// Munually clear the speed update event flag
-			uint32_t flags = osEventFlagsClear(vehicleMonitorEventFlagID, speedUpdateEventFlag);
-			assert(flags & speedUpdateEventFlag);
+			// Manually clear the speed update event flag
+			osEventFlagsClear(vehicleMonitorEventFlagID, speedUpdateEventFlag);
+//			assert(flags & speedUpdateEventFlag);
 
 			currentSpeed = getVehicleSpeed();
 		}
@@ -765,9 +772,9 @@ void vehicleMonitorTask(void* arg)
 		// Check if the direction update event flag is set
 		if(eventStatus & directionUpdateEventFlag)
 		{
-			// Munually clear the direction update event flag
-			uint32_t flags = osEventFlagsClear(vehicleMonitorEventFlagID, directionUpdateEventFlag);
-			assert(flags & directionUpdateEventFlag);
+			// Manually clear the direction update event flag
+			osEventFlagsClear(vehicleMonitorEventFlagID, directionUpdateEventFlag);
+//			assert(flags & directionUpdateEventFlag);
 
 			getVehicleDirection(&previousDirection, &currentDirection);
 		}
