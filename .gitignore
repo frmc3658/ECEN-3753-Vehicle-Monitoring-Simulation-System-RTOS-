@@ -1,6 +1,6 @@
 # Ignore the following files
 .cproject
-.msproject
+.mxproject
 .project
 McDermott_Frank_RTOS_Lab7_Mutex Debug.launch
 McDermott_Frank_RTOS_Lab7_Mutex.ioc
