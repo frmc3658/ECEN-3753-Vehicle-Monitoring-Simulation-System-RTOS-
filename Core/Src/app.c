@@ -104,13 +104,10 @@ static const osEventFlagsAttr_t vehicleMonitorEventFlagAttr = { .name = "vehicle
 static osEventFlagsId_t ledOutputEventFlagID;
 static const osEventFlagsAttr_t ledOutputEventFlagAttr = { .name = "ledOutputEventFlag" };
 
-
 /* ------------------ BOOLEANS ------------------------ */
 /* Static Bool: Buttons */
 static volatile bool buttonHeld = false;
-static volatile uint8_t directionAlertCallbackCount = 0;
-static volatile vehicleDirection currentDirection_LCD = drivingStraight;
-static volatile uint8_t currentSpeed_LCD = 0;
+
 
 /****************************************
  * 			Forward Declarations		*
@@ -144,9 +141,7 @@ static uint8_t getVehicleSpeed(void);
 static void getVehicleDirection(vehicleDirection* currentDirection, vehicleDirection* previousDirection);
 static void checkForVehicleSpeedViolation(uint8_t currentSpeed, vehicleDirection currentDirection);
 static void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehicleDirection currentDirection);
-#ifdef DEBUGGING
 static void updateLCD(uint8_t speed, vehicleDirection direction);
-#endif
 
 
 /****************************************
@@ -575,7 +570,6 @@ void checkForVehicleDirectionViolation(vehicleDirection previousDirection, vehic
 }
 
 
-#ifdef DEBUGGING
 /*
  * @brief Update LCD with speed an direction data
  *
@@ -587,39 +581,35 @@ void updateLCD(uint8_t speed, vehicleDirection direction)
 	char* speedText = "Speed: ";
 	char* dirText = "";
 
-	while(1)
+	switch(direction)
 	{
-		switch(direction)
-		{
-			case drivingStraight:
-				dirText = "Dir: Straight";
-				break;
-			case gradualLeftTurn:
-				dirText = "Dir: Grad Left";
-				break;
-			case gradualRightTurn:
-				dirText = "Dir: Grad Right";
-				break;
-			case hardLeftTurn:
-				dirText = "Dir: Hard Left";
-				break;
-			case hardRightTurn:
-				dirText = "Dir: Hard Right";
-				break;
-			default:
-				break;
-		}
-
-		LCD_Clear(0,LCD_COLOR_CYAN);
-		LCD_SetTextColor(LCD_COLOR_BLACK);
-		LCD_SetFont(&Font16x24);
-		LCD_DisplayString(10, 130, speedText);
-		LCD_DisplayNumber(100, 130, speed);
-		LCD_DisplayString(120, 130, "MPH");
-		LCD_DisplayString(10, 180, dirText);
+		case drivingStraight:
+			dirText = "Dir: Straight";
+			break;
+		case gradualLeftTurn:
+			dirText = "Dir: Grad Left";
+			break;
+		case gradualRightTurn:
+			dirText = "Dir: Grad Right";
+			break;
+		case hardLeftTurn:
+			dirText = "Dir: Hard Left";
+			break;
+		case hardRightTurn:
+			dirText = "Dir: Hard Right";
+			break;
+		default:
+			break;
 	}
+
+	LCD_Clear(0,LCD_COLOR_CYAN);
+	LCD_SetTextColor(LCD_COLOR_BLACK);
+	LCD_SetFont(&Font16x24);
+	LCD_DisplayString(10, 130, speedText);
+	LCD_DisplayNumber(100, 130, speed);
+	LCD_DisplayString(140, 130, "MPH");
+	LCD_DisplayString(10, 180, dirText);
 }
-#endif
 
 
 /********************************************
@@ -790,7 +780,7 @@ void lcdDisplayTask(void* arg)
 		osStatus_t mutexStatus = osMutexAcquire(speedDataMutexID, osWaitForever);
 		assert(mutexStatus == osOK);
 
-		currentSpeed_LCD = speedData.speed;
+		uint8_t currentSpeed = speedData.speed;
 
 		// Release the Speed Data Mutex
 		mutexStatus = osMutexRelease(speedDataMutexID);
@@ -800,14 +790,14 @@ void lcdDisplayTask(void* arg)
 		mutexStatus = osMutexAcquire(vehicleDirDataMutexID, osWaitForever);
 		assert(mutexStatus == osOK);
 
-		currentDirection_LCD = directionData.direction;
+		vehicleDirection currentDirection = directionData.direction;
 
 		// Release the Vehicle Direction Data Mutex
 		mutexStatus = osMutexRelease(vehicleDirDataMutexID);
 		assert(mutexStatus == osOK);
 
 		// Update the LCD with the current speed and direction
-//		updateLCD(currentSpeed, currentDirection);
+		updateLCD(currentSpeed, currentDirection);
 	}
 }
 
@@ -926,8 +916,6 @@ void directionAlertTimerCallback(void* arg)
 	(void) &arg;
 
 	SEGGER_SYSVIEW_RecordEnterTimer((uint32_t)directionAlertTimerID);
-
-	directionAlertCallbackCount++;
 
 	uint32_t flags = osEventFlagsSet(ledOutputEventFlagID, activateDirAlertEventFlag);
 	assert(flags & ledOutputEventAllFlags);

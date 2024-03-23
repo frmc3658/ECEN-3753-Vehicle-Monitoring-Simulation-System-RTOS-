@@ -1,0 +1,16 @@
+# Ignore the following files
+.cproject
+.mxproject
+.project
+McDermott_Frank_RTOS_Lab7_Mutex Debug.launch
+McDermott_Frank_RTOS_Lab7_Mutex.ioc
+STM32F429ZITX_RAM.ld
+STM32F429ZITX_FLASH.ld
+Core/Src/ApplicationCode.c
+.mxproject
+
+
+
+# Ignore the following directories
+Debug
+.settings
