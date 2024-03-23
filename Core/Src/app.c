@@ -70,20 +70,14 @@ static const osTimerAttr_t lcdDisplayWakeupTimerAttr = { .name = "lcdDisplayWake
 /* Static Semaphore: Button State */
 //static StaticTask_t buttonStateSemaphoreTCB;
 static osSemaphoreId_t buttonStateSemaphorID;
-static const osSemaphoreAttr_t buttonStateSemaphorAttr = { .name = "buttonStateSemaphor",
-														   .attr_bits = 0,
-														   .cb_mem = NULL };
+static const osSemaphoreAttr_t buttonStateSemaphorAttr = { .name = "buttonStateSemaphor" };
 /* Static Semaphore: Vehicle Direction */
 //static StaticTask_t vehicleDirSemaphoreTCB;
 static osSemaphoreId_t vehicleDirSemaphoreID;
-static const osSemaphoreAttr_t vehicleDirSemaphoreAttr = { .name = "vehicleDirSemaphore",
-														   .attr_bits = 0,
-														   .cb_mem = NULL };
+static const osSemaphoreAttr_t vehicleDirSemaphoreAttr = { .name = "vehicleDirSemaphore" };
 /* Static Semaphore: LCD Display */
 static osSemaphoreId_t lcdDisplaySemaphoreID;
-static const osSemaphoreAttr_t lcdDisplaySemaphoreAttr = { .name = "lcdDisplaySemaphore",
-													       .attr_bits = 0,
-														   .cb_mem = NULL };
+static const osSemaphoreAttr_t lcdDisplaySemaphoreAttr = { .name = "lcdDisplaySemaphore" };
 
 /* ------------------ MUTEXES ------------------------ */
 /* Static Mutex: Speed Data */
